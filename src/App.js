@@ -1,25 +1,36 @@
-import logo from './logo.svg';
+import React, { lazy } from 'react'
 import './App.css';
+import { Link, useRoutes } from "react-router-dom";
+import Service from './Service'
 
+const Customer = lazy(() => import('./Customer'));
+const routes = [
+  {
+    path: "/",
+    element: <Homepage />,
+    // children: [
+    //   {
+    //     path: "messages",
+    //     element: <DashboardMessages />,
+    //   },
+    //   { path: "tasks", element: <DashboardTasks /> },
+    // ],
+  },
+  { path: "customer", element: <Customer/> },
+  { path: "service", element: <Service /> },
+]
 function App() {
-  return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
-    </div>
-  );
+  return useRoutes(routes)
 }
 
+function Homepage() {
+  return <ul>
+    <li>
+      <Link to="/customer">customer</Link>
+    </li>
+    <li>
+      <Link to="/service">service</Link>
+    </li>
+  </ul>
+}
 export default App;
