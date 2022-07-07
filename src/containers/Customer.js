@@ -7,7 +7,10 @@ import { Button, Layout, message, Modal } from "antd"
 import { PhoneOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons"
 import VideoDom from "../components/VideoDom"
 import "./index.less"
-import cn from "classnames"
+import buzz from "buzz"
+
+import callSound from "../assets/sound1.mp3"
+import answerSound from "../assets/sound5.mp3"
 
 const { Header, Sider, Content } = Layout
 
@@ -26,6 +29,13 @@ const Customer = (props) => {
 	const userVideo = useRef()
 	const connectionRef = useRef()
 	const cusVideo = useRef()
+	const callUserSound = new buzz.sound(callSound, {
+			formats: [],
+		}),
+		answerUserSound = new buzz.sound(answerSound, {
+			formats: [],
+		})
+
 	useEffect(() => {
 		// utils.getMediaStream().then((currentStream) => {
 		// 	console.log(currentStream, "currentStreamcurrentStreamcurrentStreamcurrentStream")
@@ -51,6 +61,19 @@ const Customer = (props) => {
 		})
 	}, [])
 
+	useEffect(() => {
+		if (call.isReceivingCall && !callAccepted) {
+			answerUserSound
+				.play()
+				.fadeIn()
+				.bind("timeupdate", function () {
+					var timer = buzz.toTimer(this.getTime())
+					document.getElementById("timer").innerHTML = timer
+				})
+			console.log("play")
+		}
+	}, [call, callAccepted])
+
 	//过滤能呼叫的房间list
 	const getCallList = (data) => {
 		let callList = data.filter((item) => item.id != me.current && item.type == "service")
@@ -58,10 +81,12 @@ const Customer = (props) => {
 	}
 
 	const answerCall = (state) => {
+		console.log("answerCall")
 		if (state == "cancel") {
 			socket.emit("cancelCall", { signal: null, to: call.from })
 			setCallAccepted(false)
 			setCall({ isReceivingCall: false })
+			answerUserSound.pause()
 			return
 		}
 		let stream = cusVideo.current.getStream()
@@ -76,6 +101,7 @@ const Customer = (props) => {
 
 		//应答后接收对方信号流
 		peer.on("stream", (currentStream) => {
+			answerUserSound.pause()
 			userVideo.current.srcObject = currentStream
 		})
 
@@ -97,6 +123,13 @@ const Customer = (props) => {
 		console.log("all-clients:", clients)
 		console.log("callListcallList:", callList)
 		let callid = null
+
+		callUserSound.play().fadeIn().loop()
+		// .bind("timeupdate", function () {
+		// 	var timer = buzz.toTimer(this.getTime())
+		// 	document.getElementById("timer").innerHTML = timer
+		// })
+
 		if (callList.length == 0) {
 			message.info("坐席忙,请稍后再联系")
 			return
@@ -118,6 +151,7 @@ const Customer = (props) => {
 		peer.on("stream", (currentStream) => {
 			console.log(currentStream, "streamstreamstreamstream")
 			setCallIng(false)
+			callUserSound.pause().fadeOut(1000)
 			userVideo.current.srcObject = currentStream
 		})
 
@@ -135,6 +169,8 @@ const Customer = (props) => {
 
 		socket.on("cancelCall", (signal) => {
 			console.log("cancelCall")
+			callUserSound.pause().fadeOut(1000)
+			message.info("坐席忙,请稍后再联系")
 			setCallAccepted(false)
 			setCallIng(false)
 		})
@@ -148,12 +184,9 @@ const Customer = (props) => {
 	}
 
 	return (
-		// <div className="videobox">
-		// 	<VideoDom ref={cusVideo} />
-		// </div>
-
 		<Layout>
 			<Header className="header">客户Customer</Header>
+			<div id="timer"></div>
 			<Layout>
 				<Content>
 					{call.isReceivingCall && !callAccepted && (

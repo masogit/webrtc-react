@@ -44,6 +44,7 @@ const rules = [
 		use: [{ loader: "style-loader" }, { loader: "css-loader" }, { loader: "sass-loader" }, { loader: "postcss-loader" }],
 	},
 	{ test: /\.(eot|ttf|woff|woff2)$/, use: { loader: "file-loader" } },
+	{ test: /\.(ogg|mp3|aac)$/, use: { loader: "file-loader" } },
 ]
 
 const config = {
