@@ -1,35 +1,36 @@
 /** @format */
 
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from "react"
-
+import "./videobox.less"
 import * as utils from "../util"
 
 const VideoDom = (props, ref) => {
 	const videoRef = useRef(null)
 	const [stream, setStream] = useState()
-
 	useEffect(() => {
 		const updateStream = (stream) => {
-			if (!videoRef.current) return
+			const dom = videoRef.current
+			if (!dom) return
 			// 自己则mute
-			videoRef.current.muted = !props.stream
+			dom.muted = !props.peer
+			console.log(dom, "domdomdomdomdom")
 			setStream(stream)
-			videoRef.current.srcObject = stream
+			if ("srcObject" in dom) {
+				dom.srcObject = stream
+				dom.onloadedmetadata = function () {
+					dom.play()
+				}
+				return
+			}
+			dom.src = URL.createObjectURL(stream)
+			dom.play()
 		}
-		if (props.stream) {
-			console.log(1)
-			videoRef.current.muted = false
-			videoRef.current.srcObject = props.stream
+		if (props.peer) {
+			props.peer.on("stream", updateStream)
 			return
-		} else {
-			console.log(2)
-			utils.getMediaStream().then(updateStream)
 		}
-
-		return () => {
-			if (!props.peer) return
-		}
-	}, [])
+		utils.getMediaStream().then(updateStream)
+	}, [props.peer])
 
 	useImperativeHandle(ref, () => ({
 		getStream: () => {
@@ -37,7 +38,12 @@ const VideoDom = (props, ref) => {
 		},
 	}))
 
-	return <video ref={videoRef} autoPlay></video>
+	return (
+		<div className="video-wrap">
+			{props.title && <h4>{props.title}</h4>}
+			<video ref={videoRef} autoPlay></video>
+		</div>
+	)
 }
 
 export default forwardRef(VideoDom)

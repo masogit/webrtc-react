@@ -19,14 +19,14 @@ const socket = io()
 const Customer = (props) => {
 	const [callAccepted, setCallAccepted] = useState(false)
 	const [callEnded, setCallEnded] = useState(false)
-	const [name, setName] = useState("userName")
+	const [name, setName] = useState("用户1号")
 	const [call, setCall] = useState({})
 	const [clients, setclients] = useState(null)
 	const [callList, setCallList] = useState([])
 	const [callIng, setCallIng] = useState(false)
 
 	const me = useRef("")
-	const userVideo = useRef()
+	const userVideo = useRef(null)
 	const connectionRef = useRef()
 	const cusVideo = useRef()
 	const callUserSound = new buzz.sound(callSound, {
@@ -37,11 +37,6 @@ const Customer = (props) => {
 		})
 
 	useEffect(() => {
-		// utils.getMediaStream().then((currentStream) => {
-		// 	console.log(currentStream, "currentStreamcurrentStreamcurrentStreamcurrentStream")
-		// 	setStream(currentStream)
-		// 	myVideo.current && currentStream ? (myVideo.current.srcObject = currentStream) : ""
-		// })
 		//接通后返回当前客户端socket id
 		socket.on("me", (myId) => {
 			me.current = myId
@@ -63,14 +58,7 @@ const Customer = (props) => {
 
 	useEffect(() => {
 		if (call.isReceivingCall && !callAccepted) {
-			answerUserSound
-				.play()
-				.fadeIn()
-				.bind("timeupdate", function () {
-					var timer = buzz.toTimer(this.getTime())
-					document.getElementById("timer").innerHTML = timer
-				})
-			console.log("play")
+			answerUserSound.play().fadeIn()
 		}
 	}, [call, callAccepted])
 
@@ -81,7 +69,6 @@ const Customer = (props) => {
 	}
 
 	const answerCall = (state) => {
-		console.log("answerCall")
 		if (state == "cancel") {
 			socket.emit("cancelCall", { signal: null, to: call.from })
 			setCallAccepted(false)
@@ -101,8 +88,8 @@ const Customer = (props) => {
 
 		//应答后接收对方信号流
 		peer.on("stream", (currentStream) => {
+			userVideo.current = currentStream
 			answerUserSound.pause()
-			userVideo.current.srcObject = currentStream
 		})
 
 		peer.on("close", () => {
@@ -137,6 +124,7 @@ const Customer = (props) => {
 			callid = callList[0]["id"]
 			//后续更新还能被call的客服list
 		}
+		setCall({ name: callList[0]["name"] })
 		setCallIng(true)
 		// 发起节点的initiator 需要设置为true
 		const peer = new Peer({ initiator: true, config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
@@ -149,10 +137,9 @@ const Customer = (props) => {
 		})
 		//应答后接收对方信号流
 		peer.on("stream", (currentStream) => {
-			console.log(currentStream, "streamstreamstreamstream")
+			userVideo.current = currentStream
 			setCallIng(false)
 			callUserSound.pause().fadeOut(1000)
-			userVideo.current.srcObject = currentStream
 		})
 
 		peer.on("close", () => {
@@ -201,9 +188,8 @@ const Customer = (props) => {
 						</Modal>
 					)}
 					<div className="videoBox">
-						{/* {stream && <video autoPlay muted ref={myVideo}></video>} */}
 						<VideoDom ref={cusVideo} />
-						{callAccepted && !callEnded && <video autoPlay ref={userVideo}></video>}
+						{callAccepted && !callEnded && <VideoDom title={call.name} peer={connectionRef.current} />}
 					</div>
 					{callAccepted && !callEnded ? (
 						<Button onClick={leaveCall}>挂断</Button>
@@ -213,7 +199,7 @@ const Customer = (props) => {
 						</Button>
 					)}
 				</Content>
-				<Sider className="sider">
+				<Sider className="sider" breakpoint="sm">
 					<h2>
 						<MessageOutlined style={{ fontSize: "16px", color: "#08c" }} />
 						在线客服

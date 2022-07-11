@@ -8,8 +8,8 @@ const addClient = (id) => {
 	}
 	return clients
 }
-const delClient = (socket) => {
-	clients = clients.filter((item) => item.id != socket.id)
+const delClient = (id) => {
+	clients = clients.filter((item) => item.id != id)
 	io.sockets.emit("clients", clients)
 	return clients
 }
@@ -20,30 +20,29 @@ const setInfo = (data) => {
 	io.sockets.emit("clients", clients)
 }
 
-const disconnect = (socket) => {
-	delClient(socket)
-}
 const p2pServer = (server) => {
 	io = require("socket.io")(server)
 	io.on("connection", (socket) => {
 		socket.emit("me", socket.id)
 
 		socket.on("disconnect", () => {
-			disconnect(socket)
+			delClient(socket.id)
 			socket.broadcast.emit("callEnded")
 		})
 
 		socket.on("callUser", ({ userToCall, signalData, from, name }) => {
 			io.to(userToCall).emit("callUser", { signal: signalData, from, name })
+			delClient(userToCall) // 删掉被呼叫的人
 		})
 
 		socket.on("answerCall", (data) => {
 			io.to(data.to).emit("callAccepted", data.signal)
+			delClient(data.to) // 删掉向外呼的人
 		})
+
 		socket.on("cancelCall", (data) => {
 			io.to(data.to).emit("cancelCall", data.signal)
 		})
-
 		socket.on("setInfo", (data) => setInfo(data))
 	})
 }
