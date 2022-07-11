@@ -1,62 +1,49 @@
 /** @format */
 let io
-let clients = [{ id: 0, name: "0", type: "customer|service", offer: null, answer: null, customer: null, service: null }]
-
+// let clients = [{ id: 0, name: "0", type: "customer|service", customer: null, service: null }]
+let clients = []
 const addClient = (id) => {
-	if (clients.indexOf((item) => item.id == id) < 0) {
+	if (!~clients.indexOf((item) => item.id == id)) {
 		clients.push({ id, name: null })
 	}
 	return clients
 }
-const delClient = (socket) => {
-	clients = clients.filter((item) => item.id != socket.id)
-	console.log("delClient-clients", clients)
-	console.log("delClient-id", socket.id)
-    socket.emit("clients", clients)
+const delClient = (id) => {
+	clients = clients.filter((item) => item.id != id)
+	io.sockets.emit("clients", clients)
 	return clients
 }
-const setInfo = (socket, data) => {
-	console.log("setInfo-data", data)
-	const client = clients.find((item) => item.id == data.id)
-	if (client) {
-		Object.assign(client, data)
+const setInfo = (data) => {
+	if (!clients.some((item) => item.id == data.id)) {
+		clients.push(data)
 	}
-	io.emit("clients", clients)
+	io.sockets.emit("clients", clients)
 }
-const calling = (socket, data) => {
-	console.log("calling", data)
-	const customer = clients.find((item) => item.id == socket.id)
-	const service = clients.find((item) => item.type == "service")
-	if (customer && service) {
-		socket.to(service.id).emit("calling", data.offer)
-		service.customerId = customer.id
-        customer.serviceId = service.id
-	}
-    io.emit("clients", clients)
-}
-const answering = (socket, data) => {
-	const service = clients.find((item) => item.id == socket.id)
-	if (service && service.customerId) {
-		socket.to(service.customerId).emit("answer", data.answer)
-	}
-	console.log("answering", service)
-}
-const disconnect = (socket) => {
-    delClient(socket)
-    io.emit("clients", clients)
-    console.log("disconnectdisconnectdisconnectdisconnect", socket.id)
-}
+
 const p2pServer = (server) => {
-    io = require("socket.io")(server)
+	io = require("socket.io")(server)
 	io.on("connection", (socket) => {
-		console.log(`Client with ID of ${socket.id} connected! `)
-		addClient(socket.id)
-		console.log(clients, "clientsclientsclientsclients")
-		io.sockets.emit("clients", clients)
-		socket.on("setInfo", (data) => setInfo(socket, data))
-		socket.on("calling", (data) => calling(socket, data))
-		socket.on("answering", (data) => answering(socket, data))
-		socket.on("disconnect", () => disconnect(socket))
+		socket.emit("me", socket.id)
+
+		socket.on("disconnect", () => {
+			delClient(socket.id)
+			socket.broadcast.emit("callEnded")
+		})
+
+		socket.on("callUser", ({ userToCall, signalData, from, name }) => {
+			io.to(userToCall).emit("callUser", { signal: signalData, from, name })
+			delClient(userToCall) // 删掉被呼叫的人
+		})
+
+		socket.on("answerCall", (data) => {
+			io.to(data.to).emit("callAccepted", data.signal)
+			delClient(data.to) // 删掉向外呼的人
+		})
+
+		socket.on("cancelCall", (data) => {
+			io.to(data.to).emit("cancelCall", data.signal)
+		})
+		socket.on("setInfo", (data) => setInfo(data))
 	})
 }
 exports.clients = clients
