@@ -6,15 +6,22 @@ import * as utils from "../util"
 
 const VideoDom = (props, ref) => {
 	const videoRef = useRef(null)
-	const [stream, setStream] = useState()
+	const streams = useRef(null)
+	const [videoTracks, setVideoTracks] = useState([])
 	useEffect(() => {
 		const updateStream = (stream) => {
+			console.log("updateStream")
 			const dom = videoRef.current
 			if (!dom) return
 			// 自己则mute
 			dom.muted = !props.peer
-			console.log(dom, "domdomdomdomdom")
-			setStream(stream)
+			let getAudioTracks = stream.getAudioTracks()
+			let getVideoTracks = stream.getVideoTracks()
+			console.log(getAudioTracks, "getAudioTracks")
+			console.log(getVideoTracks, "getVideoTracks")
+			setVideoTracks(getVideoTracks)
+			// setStream(stream)
+			streams.current = stream
 			if ("srcObject" in dom) {
 				dom.srcObject = stream
 				dom.onloadedmetadata = function () {
@@ -26,15 +33,20 @@ const VideoDom = (props, ref) => {
 			dom.play()
 		}
 		if (props.peer) {
+			console.log("props.peer")
 			props.peer.on("stream", updateStream)
 			return
 		}
 		utils.getMediaStream().then(updateStream)
+
+		return () => {
+			utils.revokeMediaStream(streams.current)
+		}
 	}, [props.peer])
 
 	useImperativeHandle(ref, () => ({
 		getStream: () => {
-			return stream
+			return streams.current
 		},
 	}))
 

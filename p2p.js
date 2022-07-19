@@ -1,50 +1,65 @@
 /** @format */
 let io
 // let clients = [{ id: 0, name: "0", type: "customer|service", customer: null, service: null }]
-let clients = []
-const addClient = (id) => {
-	if (!~clients.indexOf((item) => item.id == id)) {
-		clients.push({ id, name: null })
-	}
-	return clients
-}
-const delClient = (id) => {
-	clients = clients.filter((item) => item.id != id)
-	io.sockets.emit("clients", clients)
-	return clients
-}
-const setInfo = (data) => {
-	if (!clients.some((item) => item.id == data.id)) {
-		clients.push(data)
-	}
-	io.sockets.emit("clients", clients)
-}
 
 const p2pServer = (server) => {
 	io = require("socket.io")(server)
-	io.on("connection", (socket) => {
+	const userNamespace = io.of(/^\/linkUp-\w{1,}/)
+
+	let allClients = {}
+
+	const delClient = (id, workspace) => {
+		console.log(id, "delClientdelClientdelClientdelClientdelClientdelClient")
+		let spaceName = workspace.name
+		allClients[spaceName] = allClients[spaceName].filter((item) => item.id != id)
+		workspace.emit("clients", allClients[spaceName])
+		console.log(allClients[spaceName], "clients")
+		return allClients
+	}
+	const setInfo = (data, workspace) => {
+		let spaceName = workspace.name
+		if (allClients[spaceName]) {
+			if (!allClients[spaceName].some((item) => item.id == data.id)) {
+				allClients[spaceName].push(data)
+			}
+		} else {
+			allClients[spaceName] = [data]
+		}
+		console.log(allClients, "allClients")
+		workspace.emit("clients", allClients[spaceName])
+	}
+
+	// userNamespace.use((socket, next) => {
+	// 	console.log(socket, "socketsocketsocketsocket")
+	// 	next()
+	// })
+
+	userNamespace.on("connection", (socket) => {
+		const workspace = socket.nsp
 		socket.emit("me", socket.id)
+		socket.on("setInfo", (data) => setInfo(data, workspace))
 
 		socket.on("disconnect", () => {
-			delClient(socket.id)
-			socket.broadcast.emit("callEnded")
+			console.log(socket.id, "disconnect")
+			delClient(socket.id, workspace)
+			// socket.broadcast.emit("callEnded")
 		})
 
 		socket.on("callUser", ({ userToCall, signalData, from, name }) => {
-			io.to(userToCall).emit("callUser", { signal: signalData, from, name })
-			delClient(userToCall) // 删掉被呼叫的人
+			// console.log("server-callUser")
+			userNamespace.to(userToCall).emit("callUser", { signal: signalData, from, name })
+			delClient(userToCall, workspace) // 删掉被呼叫的人
 		})
 
 		socket.on("answerCall", (data) => {
-			io.to(data.to).emit("callAccepted", data.signal)
-			delClient(data.to) // 删掉向外呼的人
+			userNamespace.to(data.to).emit("callAccepted", data.signal)
+			delClient(data.to, workspace) // 删掉向外呼的人
 		})
 
 		socket.on("cancelCall", (data) => {
-			io.to(data.to).emit("cancelCall", data.signal)
+			userNamespace.to(data.to).emit("cancelCall", data.signal)
 		})
-		socket.on("setInfo", (data) => setInfo(data))
 	})
 }
-exports.clients = clients
+// exports.clients = clients
 module.exports = p2pServer

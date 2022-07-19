@@ -2,21 +2,21 @@
 
 import React, { useState, useRef, useEffect } from "react"
 import { io } from "socket.io-client"
+import { useParams } from "react-router-dom"
 import Peer from "simple-peer"
 import { Button, Layout, message, Modal } from "antd"
 import { PhoneOutlined, MessageOutlined, UserOutlined } from "@ant-design/icons"
-import VideoDom from "../components/VideoDom"
+import VideoDom from "../../components/VideoDom"
 import "./index.less"
 import buzz from "buzz"
-
-import callSound from "../assets/sound1.mp3"
-import answerSound from "../assets/sound5.mp3"
-
+import callSound from "../../assets/sound1.mp3"
+import answerSound from "../../assets/sound5.mp3"
 const { Header, Sider, Content } = Layout
-
-const socket = io()
+const socket = io("/linkUp-ruijin")
 
 const Service = (props) => {
+	const { hospitalUid } = useParams()
+	console.log(hospitalUid, "hospitalUid")
 	const [callAccepted, setCallAccepted] = useState(false)
 	const [callEnded, setCallEnded] = useState(false)
 	const [name, setName] = useState("客服一号")
@@ -24,19 +24,19 @@ const Service = (props) => {
 	const [clients, setclients] = useState(null)
 	const [callList, setCallList] = useState([])
 	const [callIng, setCallIng] = useState(false)
-
 	const me = useRef("")
 	const userVideo = useRef(null)
 	const connectionRef = useRef()
 	const cusVideo = useRef()
-	const callUserSound = new buzz.sound(callSound, {
-			formats: [],
-		}),
-		answerUserSound = new buzz.sound(answerSound, {
+	const answerUserSound = useRef()
+	useEffect(() => {
+		if (socket.disconnected) {
+			console.log("connectconnectconnectconnectconnectconnect")
+			socket.connect()
+		}
+		answerUserSound.current = new buzz.sound(answerSound, {
 			formats: [],
 		})
-
-	useEffect(() => {
 		//接通后返回当前客户端socket id
 		socket.on("me", (myId) => {
 			me.current = myId
@@ -46,25 +46,32 @@ const Service = (props) => {
 
 		//监听客户端clients更新
 		socket.on("clients", (data) => {
+			console.log(data, "clients")
 			setclients(data)
 			getCallList(data)
 		})
 
+		//监听客户端clients更新
+		socket.on("callEnded", (data) => {
+			console.log("callEnded")
+			setCallEnded(true)
+			connectionRef.current && connectionRef.current.destroy()
+			window.location.reload()
+		})
+
 		//被呼叫
 		socket.on("callUser", ({ from, name: callerName, signal }) => {
+			console.log("callUser")
+			answerUserSound.current.play()
 			setCall({ isReceivingCall: true, from, name: callerName, signal })
 		})
+		return () => socket.disconnect()
 	}, [])
-
-	useEffect(() => {
-		if (call.isReceivingCall && !callAccepted) {
-			answerUserSound.play().fadeIn()
-		}
-	}, [call, callAccepted])
 
 	//过滤能呼叫的房间list
 	const getCallList = (data) => {
 		let callList = data.filter((item) => item.id != me.current && item.type != "service")
+		console.log(callList, "callList")
 		setCallList(callList)
 	}
 
@@ -73,12 +80,12 @@ const Service = (props) => {
 			socket.emit("cancelCall", { signal: null, to: call.from })
 			setCallAccepted(false)
 			setCall({ isReceivingCall: false })
-			answerUserSound.pause()
+			answerUserSound.current.pause()
 			return
 		}
 		let stream = cusVideo.current.getStream()
 		setCallAccepted(true)
-		const peer = new Peer({ initiator: false, config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
+		const peer = new Peer({ initiator: false, channelConfig: { label: "channe2" }, channelName: "channe2", config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
 
 		connectionRef.current = peer
 		//得到回复
@@ -89,7 +96,7 @@ const Service = (props) => {
 		//应答后接收对方信号流
 		peer.on("stream", (currentStream) => {
 			userVideo.current = currentStream
-			answerUserSound.pause()
+			answerUserSound.current.pause()
 		})
 
 		peer.on("close", () => {
@@ -104,6 +111,9 @@ const Service = (props) => {
 
 	//呼叫
 	const callUser = (id) => {
+		const callUserSound = new buzz.sound(callSound, {
+			formats: [],
+		})
 		let stream = cusVideo.current.getStream()
 
 		console.log("my-id:", me)
@@ -111,7 +121,6 @@ const Service = (props) => {
 		console.log("callListcallList:", callList)
 		let callid = null
 
-		callUserSound.play().fadeIn().loop()
 		// .bind("timeupdate", function () {
 		// 	var timer = buzz.toTimer(this.getTime())
 		// 	document.getElementById("timer").innerHTML = timer
@@ -124,10 +133,10 @@ const Service = (props) => {
 			callid = id
 			//后续更新还能被call的客服list
 		}
-
+		callUserSound.play().fadeIn()
 		setCallIng(true)
 		// 发起节点的initiator 需要设置为true
-		const peer = new Peer({ initiator: true, config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
+		const peer = new Peer({ initiator: true, channelConfig: { label: "channe1" }, channelName: "channe2", config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
 
 		connectionRef.current = peer
 		//得到回复
@@ -173,7 +182,6 @@ const Service = (props) => {
 	return (
 		<Layout>
 			<Header className="header">Service</Header>
-			<div id="timer"></div>
 			<Layout>
 				<Content>
 					{call.isReceivingCall && !callAccepted && (
