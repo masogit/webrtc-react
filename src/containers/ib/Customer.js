@@ -17,15 +17,16 @@ const socket = io("/linkUp-ib")
 const Customer = (props) => {
 	const { hospitalUid } = useParams()
 	console.log(hospitalUid, "hospitalUid")
+	const peerVal = useRef()
 	const [callAccepted, setCallAccepted] = useState(false)
 	const [callEnded, setCallEnded] = useState(false)
 	const [name, setName] = useState("用户1号")
+	const [myInfo, setMyInfo] = useState(null)
 	const [call, setCall] = useState({})
 	const [clients, setclients] = useState(null)
 	const [callList, setCallList] = useState([])
 	const [callIng, setCallIng] = useState(false)
 	const me = useRef("")
-	const userVideo = useRef(null)
 	const connectionRef = useRef()
 	const cusVideo = useRef()
 	const answerUserSound = useRef()
@@ -41,6 +42,7 @@ const Customer = (props) => {
 		socket.on("me", (myId) => {
 			me.current = myId
 			socket.emit("setInfo", { id: myId, name: name, type: "customer" })
+			setMyInfo({ id: myId, name: name, type: "customer" })
 			console.log("myid:", myId)
 		})
 
@@ -55,8 +57,8 @@ const Customer = (props) => {
 		socket.on("callEnded", (data) => {
 			console.log("callEnded")
 			setCallEnded(true)
-			connectionRef.current && connectionRef.current.destroy()
-			window.location.reload()
+			// connectionRef.current && connectionRef.current.destroy()
+			// window.location.reload()
 		})
 
 		//被呼叫
@@ -85,28 +87,28 @@ const Customer = (props) => {
 		}
 		let stream = cusVideo.current.getStream()
 		setCallAccepted(true)
-		const peer = new Peer({ initiator: false, channelConfig: { label: "channe1" }, channelName: "channe1", config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
+		peerVal.current = new Peer({ initiator: false, channelConfig: { label: "channe1" }, channelName: "channe1", config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
 
-		connectionRef.current = peer
+		connectionRef.current = peerVal.current
 		//得到回复
-		peer.on("signal", (data) => {
+		peerVal.current.on("signal", (data) => {
 			socket.emit("answerCall", { signal: data, to: call.from })
 		})
 
 		//应答后接收对方信号流
-		peer.on("stream", (currentStream) => {
-			userVideo.current = currentStream
+		peerVal.current.on("stream", (currentStream) => {
 			answerUserSound.current.pause()
 		})
 
-		peer.on("close", () => {
+		peerVal.current.on("close", () => {
 			console.log("close-peer")
+			socket.emit("setInfo", myInfo)
 			setCallEnded(true)
-			connectionRef.current.destroy()
-			window.location.reload()
+			// connectionRef.current.destroy()
+			// window.location.reload()
 		})
 
-		peer.signal(call.signal)
+		peerVal.current.signal(call.signal)
 	}
 
 	//呼叫
@@ -137,31 +139,31 @@ const Customer = (props) => {
 		setCall({ name: callList[0]["name"] })
 		setCallIng(true)
 		// 发起节点的initiator 需要设置为true
-		const peer = new Peer({ initiator: true, channelConfig: { label: "channe1" }, channelName: "channe1", config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
+		peerVal.current = new Peer({ initiator: true, config: { iceServers: [{ urls: "stun:stun.qq.com:3478" }] }, trickle: false, stream })
 
-		connectionRef.current = peer
+		connectionRef.current = peerVal.current
 		//得到回复
-		peer.on("signal", (data) => {
+		peerVal.current.on("signal", (data) => {
 			console.log({ userToCall: callid, signalData: data, from: me.current, name }, "peersignalpeersignalpeersignal")
 			socket.emit("callUser", { userToCall: callid, signalData: data, from: me.current, name })
 		})
 		//应答后接收对方信号流
-		peer.on("stream", (currentStream) => {
-			userVideo.current = currentStream
+		peerVal.current.on("stream", (currentStream) => {
 			setCallIng(false)
 			callUserSound.pause().fadeOut(1000)
 		})
 
-		peer.on("close", () => {
+		peerVal.current.on("close", () => {
 			console.log("close-peer")
+			socket.emit("setInfo", myInfo)
 			setCallEnded(true)
-			connectionRef.current.destroy()
-			window.location.reload()
+			// connectionRef.current.destroy()
+			// window.location.reload()
 		})
 
 		socket.on("callAccepted", (signal) => {
 			setCallAccepted(true)
-			peer.signal(signal)
+			peerVal.current.signal(signal)
 		})
 
 		socket.on("cancelCall", (signal) => {
@@ -176,8 +178,10 @@ const Customer = (props) => {
 	//挂断
 	const leaveCall = () => {
 		setCallEnded(true)
-		connectionRef.current.destroy()
-		window.location.reload()
+		console.log(peerVal.current, "peerpeerpeerpeerpeerpeerpeer")
+		peerVal.current.destroy()
+		// connectionRef.current.destroy()
+		// window.location.reload()
 	}
 
 	return (
