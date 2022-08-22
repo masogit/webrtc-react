@@ -25,7 +25,6 @@ export async function checkMediaPermission() {
 export function revokeMediaStream(stream) {
 	if (!stream) return
 	const tracks = stream.getTracks()
-
 	tracks.forEach(function (track) {
 		track.stop()
 	})
@@ -33,9 +32,9 @@ export function revokeMediaStream(stream) {
 
 let cachedMediaStream = null
 export async function getMediaStream() {
-	if (cachedMediaStream) {
-		return Promise.resolve(cachedMediaStream)
-	}
+	// if (cachedMediaStream) {
+	// 	return Promise.resolve(cachedMediaStream)
+	// }
 	// 请求媒体流输入
 	const stream = await navigator.mediaDevices.getUserMedia({
 		audio: true,
